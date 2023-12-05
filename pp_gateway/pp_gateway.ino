@@ -1,7 +1,6 @@
 #include "Wire.h"
 #include "Arduino.h"
 #include "MA510.h"
-#include "NeoGateway.h"
 #include "Adafruit_NeoPixel.h"
 #include "wiring_private.h"
 #include "SparkFunHTU21D.h"
@@ -59,7 +58,6 @@
   //NoeCortec variables
   Uart uart (&sercom2, 10, 9, SERCOM_RX_PAD_1, UART_TX_PAD_0);
   Adafruit_NeoPixel neo_pixels(1, 35, NEO_RGB + NEO_KHZ800);
-  NeoGateway gateway;
 
   char neo_msg[150] = {0};
 
