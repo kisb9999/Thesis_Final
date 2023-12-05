@@ -22,6 +22,7 @@
   float temperature;
   float humidity;
 
+  //Getting data from the NeoCortec module through this.
   Uart ncSerial(&sercom2, 10, 9, SERCOM_RX_PAD_1, UART_TX_PAD_0);
 
   //NeoCortec variables
@@ -53,6 +54,7 @@
   float node19_adc2_avg = 0;
   int node19_ctr = 0;
 
+//Attach the interrupt handler to the SERCOM for the on board NeoCortec module
 void SERCOM2_Handler(){
   ncSerial.IrqHandler();
 }
@@ -69,16 +71,20 @@ void setup() {
 
   SerialUSB.println("The program has started!");
 
-
+  //Initialize serial communication on the NeoCortec's serial port.
   pinMode(34, OUTPUT);
   digitalWrite(34, HIGH);
   delay(500);
   ncSerial.begin(115200);
+
+  //Assign RX function to pin 10
   pinPeripheral(10, PIO_SERCOM_ALT);
+  //Assign RT function to pin 9
   pinPeripheral(9, PIO_SERCOM_ALT);
   ncSerial.end();
   ncSerial.begin(115200);
 
+  //Initialize MA510 modem
   SerialUSB.println("Init modem...");
   Serial.begin(115200);
   
@@ -90,6 +96,7 @@ void setup() {
     SerialUSB.println("The modem is on");
   }
 
+  //Get the needed data
   ip = modem.getIP("cloud.e-iot.info", 2000, 3, DEFAULT_IP);
 
   SerialUSB.println("--------------------");
@@ -124,7 +131,8 @@ void setup() {
   SerialUSB.print("The returned temp is: ");
   SerialUSB.println(temp);
   SerialUSB.println("--------------------");
-  
+
+  //Initialize RGB LED
   pixels.begin();
   pixels.clear();
   pixels.setBrightness(50);
@@ -148,7 +156,9 @@ void loop() {
   long adc3_l = 0;
   memset(neo_message, 0, sizeof(neo_message));
   int counter = 0;
-  
+
+  //Checking if data comes from the NeoCortec module on the connected UART port
+  //If yes, then pass it on to the GSM modem. 
   if(ncSerial.available() > 0){
     SerialUSB.print("Data received from the NeoCortec module: ");
     delay(200);
@@ -176,7 +186,8 @@ void loop() {
         node_id = neo_message[i + 3];
 
 
-        //I2C sensor module
+        //I2C sensor module (Node 1 and 2)
+        //Checking the second byte, because based on that we can differentiate between the I2C and GPIO nodes
         if(neo_message[i + 1] == 0x0a){
           temperature = (float)((neo_message[i + 8] << 8 | neo_message[i + 9]) & 0xFFFC);
           temperature = 175.72 * (temperature / 65536) - 46.85;
@@ -214,7 +225,7 @@ void loop() {
         }
 
 
-        //GPIO sensor module
+        //GPIO sensor module (Node 2 and 4)
         if(neo_message[i + 1] == 0x12){
           magnet_ctr = neo_message[i + 10] * 256 + neo_message[i + 11];
           adc1 = (float)(neo_message[i + 12] << 4 | neo_message[i + 13] >> 4);
@@ -271,12 +282,14 @@ void loop() {
   loop_counter++;
   if(loop_counter == 100){
 
+    //Using the RGB LED to indicate if the gateway is sending data
     pixels.begin();     
     pixels.clear();
     pixels.setBrightness(50);
     pixels.setPixelColor(0, 0, 255, 0);
     pixels.show();
-    
+
+    //Storing all the data in an array that will be passed on to the Send method
     float data_array[] = {vcc, node11_temp_avg, node11_hum_avg, node16_temp_avg, node16_hum_avg, node15_adc1_avg, node15_adc2_avg, node19_adc1_avg, node19_adc2_avg};
     modem.sendData(imei, sim, ip, firmware_version, temp, data_array);
 
