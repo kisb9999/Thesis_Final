@@ -299,7 +299,7 @@ String MA510::reader(){
   return response;
 }
 
-//This method extracts the IP and the IMEI from the messages.
+//This method extracts the IP or the Voltage from the message.
 String MA510::getUsefulPart(char* expected_answer, char* response, const char* value){
   String final = "";
 
@@ -313,7 +313,7 @@ String MA510::getUsefulPart(char* expected_answer, char* response, const char* v
     return "Error!"; 
   }
 
-  //Extracts the IP or the IMEI based on the position in the response message.
+  //Extracts the IP or the Voltage based on the position in the response message.
   int char_counter = position_of_string + expected_answer_string.length();
   while(answer_string.charAt(char_counter) != '\r' && char_counter < strlen(response)){
     final += (char)answer_string.charAt(char_counter);
