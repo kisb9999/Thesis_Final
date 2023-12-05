@@ -71,7 +71,9 @@ void setup() {
 
   SerialUSB.println("The program has started!");
 
+  //LAN
   //Initialize serial communication on the NeoCortec's serial port.
+  //**********************************************************************
   pinMode(34, OUTPUT);
   digitalWrite(34, HIGH);
   delay(500);
@@ -83,6 +85,7 @@ void setup() {
   pinPeripheral(9, PIO_SERCOM_ALT);
   ncSerial.end();
   ncSerial.begin(115200);
+  //**********************************************************************
 
   //Initialize MA510 modem
   SerialUSB.println("Init modem...");
