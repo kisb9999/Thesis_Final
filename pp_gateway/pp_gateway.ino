@@ -14,7 +14,7 @@
   const float DEFAULT_VCC = 0.1;
   const String DEFAULT_TEMP = "-51";
 
-  const String firmware_version = "E-IoTMini-SAMD21 2023-11-08";
+  const String firmware_version = "E-IoTMini-SAMD21 TEST";
   
   Adafruit_NeoPixel pixels(1, 13, NEO_RGB + NEO_KHZ800);
   HTU21D temp_hum_sensor;
@@ -84,6 +84,7 @@ void setup() {
     SerialUSB.println("The modem is on");
   }
 
+  //Get all the needed data.
   ip = modem.getIP("cloud.e-iot.info", 2000, 3, DEFAULT_IP);
 
   SerialUSB.println("--------------------");
@@ -118,21 +119,15 @@ void setup() {
   SerialUSB.print("The returned temp is: ");
   SerialUSB.println(temp);
   SerialUSB.println("--------------------");
-  
+
+  //This part is for the RGB LED
   pixels.begin();
   pixels.clear();
   pixels.setBrightness(50);
   pixels.setPixelColor(0,50,50,50);
   pixels.show();
 
-  temp_hum_sensor.begin();
-  temperature = round(temp_hum_sensor.readTemperature() * 100);
-  humidity = round(temp_hum_sensor.readHumidity() * 100);
-  SerialUSB.println("--------------------");
-  SerialUSB.print("Temp and hum: ");
-  SerialUSB.println(temperature);
-  SerialUSB.println(humidity);
-  SerialUSB.println("--------------------");
+  temp_hum_sensor.begin(); 
 
   SerialUSB.println("Initializing magometer...");
   if(!magometer.begin())
@@ -232,6 +227,16 @@ void loop() {
   gyroX = totalGyroX / read_counter_gyro;
   gyroY = totalGyroY / read_counter_gyro;
   gyroZ = totalGyroZ / read_counter_gyro;
+
+  //Read data from the HTU21D sensor
+  temp_hum_sensor.begin();
+  temperature = round(temp_hum_sensor.readTemperature() * 100);
+  humidity = round(temp_hum_sensor.readHumidity() * 100);
+  SerialUSB.println("--------------------");
+  SerialUSB.print("Temp and hum: ");
+  SerialUSB.println(temperature);
+  SerialUSB.println(humidity);
+  SerialUSB.println("--------------------");
 
   SerialUSB.println("***************************************************************************************************");
   SerialUSB.println(imei);
