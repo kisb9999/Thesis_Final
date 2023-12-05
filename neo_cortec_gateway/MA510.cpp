@@ -2,8 +2,8 @@
 #include "stddef.h"
 #include "MA510.h"
 
+//Turns on the MA510 modem.
 bool MA510::turnOn(int netLightPIN, int modemPIN){
-  SerialUSB.println("turnon was called");
   pinMode(netLightPIN, OUTPUT);
   digitalWrite(netLightPIN, HIGH);
   delay(1000);
@@ -16,25 +16,32 @@ bool MA510::turnOn(int netLightPIN, int modemPIN){
   return isOn();
 }
 
-bool MA510::isOn(){
-  SerialUSB.println("isOn was called.");
-  String res = sendAT();
-  //SerialUSB.print("isOn-ba kapott valasz a sendCommandtol: ");
-  //SerialUSB.print("isOn-ba kapott valasz a sendATtol: ");
-  //SerialUSB.println(res);
-  if(MA510::checkResponse(res))
-    return true;
-  return false;
+void MA510::turnOff(){
+  pinMode(12, OUTPUT);
+  digitalWrite(12, HIGH);
+  delay(3000);
+  digitalWrite(12, LOW);
 }
 
+//Checks if the modem is on by sending an AT command. In the checkResponse method it checks if the answer was OK.
+bool MA510::isOn(){
+  //SerialUSB.println("isOn was called.");
+  String res = sendAT();
+  return MA510::checkResponse(res);
+}
+
+//I use this method to send different AT commands to the modem.
 String MA510::sendCommand(String command, unsigned int timeout){
   //SerialUSB.println("sendCommand was called.");
   String response = "";
+
+  //This line send the command itself to the modem's UART serial port.
   Serial.println(command);
   unsigned int previous = millis();
 
   delay(3000);
-  
+
+  //This loop reads the resoponse to the AT command.
   while(Serial.available() > 0 && (millis()-previous) < timeout){
     //SerialUSB.println("sendCommand loop was called.");
     response += (char)Serial.read();
@@ -47,8 +54,9 @@ String MA510::sendCommand(String command, unsigned int timeout){
   return response;
 }
 
+//This is the method to send the basic AT command. Could have used the sendCommand with AT as parameter.
 String MA510::sendAT(){
-  SerialUSB.println("Send at was called");
+  //SerialUSB.println("Send at was called");
   String s = "";
   Serial.println("AT");
   
@@ -56,23 +64,17 @@ String MA510::sendAT(){
   
   while(Serial.available() > 0){
     //SerialUSB.println("sendAT loop");
-    if(Serial.available() > 0){
-      s += (char)Serial.read();
-    }
+    s += (char)Serial.read();
   }
-
-  //This print is only for testing purposes
-  /*
-  SerialUSB.println("----------------------------");
-  SerialUSB.println("SendAT");
-  SerialUSB.println(s);
-  SerialUSB.println("----------------------------");*/
   
   return s;
 }
 
+//This method gets the IP address of the cloud server. I added recursion because sometimes the hardware cannot get the IP on the first try. 
+//The users can add how many times they want the method to try again. The default is 5.
 String MA510::getIP(char* domain, unsigned int timeout, int recursion_counter, String default_value){
   SerialUSB.println("GetIP was called");
+
   char response[150];
   char expected_answer[50];
   char command_buffer[50];
@@ -81,45 +83,56 @@ String MA510::getIP(char* domain, unsigned int timeout, int recursion_counter, S
   String command_response = "";
   char value[50];
 
+  //Fill the response array.
   memset(response, '\0', 150);
 
   //To empty the input buffer
   emptyBuffer();
+  //Send this AT command to open a wireless GSM connection.
   command_response = sendCommand("AT+MIPCALL=1", 1000);
 
+  //Add the string command into the buffer.
   sprintf(command_buffer, "AT+MIPDNS=\"%s\"", domain);
   sprintf(value, "+MIPDNS: \"%s\",", domain);
 
+  //Send the AT command to get the IP
   Serial.println(command_buffer);
   delay(1000);
 
+  //Load the response message from the cloud
   previous_time = millis();
-  while((millis() - previous_time) < timeout){
-    if(Serial.available() > 0){
-      response[counter] = Serial.read();
-      counter++;
-    }
+  while(Serial.available() > 0 && (millis() - previous_time) < timeout){    
+    response[counter] = Serial.read();
+    counter++;
   }
 
+  //Just printing out the response to check the functionalities.
   SerialUSB.println("----------------------------------------------------------------");
-  SerialUSB.print("THis is the response: ");
+  SerialUSB.print("This is the response: ");
   SerialUSB.println(response);
   SerialUSB.println("----------------------------------------------------------------");
   emptyBuffer();
 
+  //Close the GSM link.
   command_response = sendCommand("AT+MIPCALL=0", 1000);
   delay(1000);
   SerialUSB.println("Modem disconnected.");
+
+  //Just to follow the number of runs.
   SerialUSB.println("----------------------------------------------------------------");
   SerialUSB.print("Recursion Counter: ");
   SerialUSB.println(recursion_counter);
   SerialUSB.println("----------------------------------------------------------------");
 
+  //This method returns the IP from the response message.
   String final = getUsefulPart(expected_answer, response, value);
   SerialUSB.println("----------------------------------------------------------------");
   SerialUSB.print("Final ip: ");
   SerialUSB.println(final);
   SerialUSB.println("----------------------------------------------------------------");
+  
+  //If there is an error, so the IP is not present call the method again. If the method ran more times then the recursion_counter set the default value.
+  //Users can set a default IP address.
   if(final == "Error!"){
     if(recursion_counter == 0){
       return default_value;
@@ -127,20 +140,25 @@ String MA510::getIP(char* domain, unsigned int timeout, int recursion_counter, S
     recursion_counter--;
     return getIP(domain, timeout, recursion_counter, default_value);
   }
+
+  //Return the IP address as a string.
   return final;
 }
 
+//This method returns the modem's IMEI number.
 String MA510::getIMEI(int recursion_counter, String default_value){
   SerialUSB.println("GetIMEI was called");
   Serial.println("AT+CGSN");
   delay(500);
 
+  //I store the response from the modem. Imei number is in the message but it has to be extracted.
   String imei = reader();
   int pos = imei.indexOf("AT+CGSN");
 
   SerialUSB.print("imei recursion_counter: ");
   SerialUSB.println(recursion_counter);
-  
+
+  //Check if the return message contains the IMEI or there was an error.
   if(pos == -1){
     if(recursion_counter == 0){
       return default_value;
@@ -148,10 +166,13 @@ String MA510::getIMEI(int recursion_counter, String default_value){
     recursion_counter--;
     return getIMEI(recursion_counter, default_value);
   }
+
+  //Extract the IMEI number from the message.
   String final = imei.substring(pos+10, pos+25); 
   return final;
 }
 
+//Similar to the getIMEI. This method returns the modem's CCID (SIM).
 String MA510::getCCID(int recursion_counter, String default_value){
   SerialUSB.println("GetCCID was called");
   Serial.println("AT+CCID");
@@ -174,6 +195,7 @@ String MA510::getCCID(int recursion_counter, String default_value){
   return final;
 }
 
+//This method reads and returns the value of the voltage inside the MA510 modem.
 float MA510::getModemVoltage(unsigned int timeout, int recursion_counter, float default_value){
   SerialUSB.println("GetVCC was called");
   String vcc = "";
@@ -187,19 +209,19 @@ float MA510::getModemVoltage(unsigned int timeout, int recursion_counter, float 
 
   emptyBuffer();
 
+  //This is the AT command to get the voltage.
   Serial.println("AT+CBC");
 
   previous_time = millis();
-  while((millis() - previous_time) < timeout){
-    if(Serial.available() > 0){
-      response[counter] = Serial.read();
-      counter++;
-    }
+  while(Serial.available() > 0 && (millis() - previous_time) < timeout){
+    response[counter] = Serial.read();
+    counter++;
   }
 
   SerialUSB.print("vcc recursion_counter: ");
   SerialUSB.println(recursion_counter);
-  
+
+  //Extract the voltage data from the returned message.
   vcc = getUsefulPart(expected_answer, response, "+CBC: ");
   if(vcc == "Error!"){
     if(recursion_counter == 0){
@@ -208,6 +230,7 @@ float MA510::getModemVoltage(unsigned int timeout, int recursion_counter, float 
     recursion_counter--;
     return getModemVoltage(timeout, recursion_counter, default_value);
   }
+  //Convert value to float.
   vcc.replace(",", ".");
   float final = vcc.toFloat() * 10;
   return final;
@@ -229,11 +252,9 @@ String MA510::getModemInternalTemp(unsigned int timeout, int recursion_counter, 
   Serial.println("AT+MTSM=1");
 
   previous_time = millis();
-  while((millis() - previous_time) < timeout){
-    if(Serial.available() > 0){
-      response[counter] = Serial.read();
-      counter++;
-    }
+  while(Serial.available() > 0 &&(millis() - previous_time) < timeout){
+    response[counter] = Serial.read();
+    counter++;
   }
 
   SerialUSB.print("Temp recursion counter: ");
@@ -262,18 +283,14 @@ void MA510::emptyBuffer(){
   delay(500);
 }
 
+//Checks if the AT command returns an OK.
 bool MA510::checkResponse(String s){
-  SerialUSB.println("check respinse was called");
-  /*
-  SerialUSB.println("---------------------------");
-  SerialUSB.print("Check Response Gets this string: ");
-  SerialUSB.println(s);
-  SerialUSB.println("---------------------------");*/
   if(s.indexOf("OK") == -1)
     return false;
   return true;
 }
 
+//Reads the response from AT commands.
 String MA510::reader(){
   String response = "";
   while(Serial.available() > 0){
@@ -282,8 +299,11 @@ String MA510::reader(){
   return response;
 }
 
+//This method extracts the IP and the IMEI from the messages.
 String MA510::getUsefulPart(char* expected_answer, char* response, const char* value){
   String final = "";
+
+  //Load into string buffer
   sprintf(expected_answer, value);
   String expected_answer_string = (String)expected_answer;
   String answer_string = (String)response;
@@ -293,11 +313,10 @@ String MA510::getUsefulPart(char* expected_answer, char* response, const char* v
     return "Error!"; 
   }
 
+  //Extracts the IP or the IMEI based on the position in the response message.
   int char_counter = position_of_string + expected_answer_string.length();
   while(answer_string.charAt(char_counter) != '\r' && char_counter < strlen(response)){
-    if(answer_string.charAt(char_counter) != '\r'){
-      final += (char)answer_string.charAt(char_counter);
-    }
+    final += (char)answer_string.charAt(char_counter);
     char_counter++;
   }
   return final;
